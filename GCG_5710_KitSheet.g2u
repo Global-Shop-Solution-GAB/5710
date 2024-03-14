@@ -1,0 +1,404 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare	
+	
+	
+
+'GCG_5710.config file sample saved in Global Custom\5710 folder
+'//KIT Sheet Import Location 
+'INPUT1|\GlobalShopDocs\Kit_Sheets\Kits2.xls
+'INPUT2|\GlobalShopDocs\Kit_Sheets\Kits.xls
+'//KIT Sheet Report Output Location 
+'OUTPUT|\GlobalShopDocs\Kit_Sheets\
+
+'Barcode WO Print
+F.Intrinsic.Control.If(V.Caller.Hook,=,16090)
+f.Intrinsic.Control.andIf(v.Passed.009001,=,"001811")
+	'Print
+	F.Intrinsic.Control.CallSub(Print_Report_1)
+f.Intrinsic.Control.elseIf(Variable.Ambient.IsInTaskScheduler,=,True)
+	'Call Import PROC
+	F.Intrinsic.Control.CallSub(Loaddata1)
+f.Intrinsic.Control.EndIf 
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Loaddata1.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare	
+
+V.Local.sFile.Declare
+	V.Local.bEx.Declare
+	V.Local.bEx1.Declare
+	V.Local.sData.Declare
+	V.Local.sRet.Declare
+	V.Local.sRow.Declare
+	V.Local.sFieldNames.Declare
+	V.Local.sTypes.Declare
+	V.Local.i.Declare
+	
+	
+	'Read Config file
+	f.Intrinsic.Control.CallSub(Read_configFile)
+	
+	V.Local.sFile.Set(V.Global.sFile1)
+	F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bEx)
+	f.Intrinsic.Control.If(V.Local.bEx,=,True)
+		Function.Automation.MSExcel.CreateAppObject("EXCEL")
+		Function.Automation.MSExcel.OpenWorkbook("EXCEL","BOOK",V.Local.sFile)
+		Function.Automation.MSExcel.OpenWorksheet("BOOK","SHEET",1)
+	
+		F.Automation.MSExcel.ReadSpreadsheet(V.Local.sFile,8,,V.Local.sRow)
+		
+		F.Automation.Generic.DestroyObject("SHEET")
+		F.Automation.Generic.DestroyObject("BOOK")
+		F.Automation.Generic.DestroyObject("EXCEL")
+		
+		F.Intrinsic.String.Split(V.Local.sRow,"&^&",V.Local.sRet)
+		
+		V.Local.sFieldNames.Set("KIT_NO*!*Item_NO*!*Machine*!*Tool_No*!*Tool_Desc*!*Qty*!*Location*!*Tool_Comment")
+		V.Local.sTypes.Set("String*!*String*!*String*!*String*!*String*!*String*!*String*!*String")
+	
+	
+		'Reading from spreadsheet
+		F.Data.DataTable.CreateFromString("Import1",V.Local.sRet,V.Local.sFieldNames,V.Local.sTypes,"*!*","$!$",True)
+		F.Intrinsic.File.DeleteFile(V.Local.sFile)
+	f.Intrinsic.Control.EndIf 
+	
+	'F.Intrinsic.String.Build("{0}\\GlobalShopDocs\Kit_Sheets\kits.xls",V.Caller.GlobalDir,V.Local.sFile)
+'	V.Local.sFile.Set("Y:\temp\Current\5710 Betts Industries Kitsheet\kits.xls")
+
+	V.Local.sFile.Set(V.Global.sFile2)
+	F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bEx1)
+	f.Intrinsic.Control.If(V.Local.bEx1,=,True)
+		Function.Automation.MSExcel.CreateAppObject("EXCEL")
+		Function.Automation.MSExcel.OpenWorkbook("EXCEL","BOOK",V.Local.sFile)
+		Function.Automation.MSExcel.OpenWorksheet("BOOK","SHEET",1)
+	
+		F.Automation.MSExcel.ReadSpreadsheet(V.Local.sFile,8,,V.Local.sRow)
+		
+		F.Automation.Generic.DestroyObject("SHEET")
+		F.Automation.Generic.DestroyObject("BOOK")
+		F.Automation.Generic.DestroyObject("EXCEL")
+		
+		F.Intrinsic.String.Split(V.Local.sRow,"&^&",V.Local.sRet)
+		
+		V.Local.sFieldNames.Set("KIT_NO*!*Item_NO*!*Machine*!*Tool_No*!*Tool_Desc*!*Qty*!*Location*!*Tool_Comment")
+		V.Local.sTypes.Set("String*!*String*!*String*!*String*!*String*!*String*!*String*!*String")
+
+		'Reading from spreadsheet
+		F.Data.DataTable.CreateFromString("Import2",V.Local.sRet,V.Local.sFieldNames,V.Local.sTypes,"*!*","$!$",True)
+		F.Intrinsic.File.DeleteFile(V.Local.sFile)
+	f.Intrinsic.Control.EndIf 
+		
+	f.Intrinsic.Control.If(V.Local.bEx,=,True,"or",V.Local.bEx1,=,True)
+		F.ODBC.Connection!con.OpenCompanyConnection(300)
+			'Empty Table
+			f.ODBC.Connection!con.execute("delete from GCG_5710_KitSheet")
+			
+			f.Intrinsic.Control.If(V.Local.bEx,=,True)
+				f.Intrinsic.Control.If(v.DataTable.Import1.RowCount,>,0)
+					'load all data no key
+					F.Data.DataTable.SaveToDB("Import1", "con","GCG_5710_KitSheet","",128,"Kit_No@!@Kit_No*!*Item_No@!@Item_No*!*Machine@!@Machine*!*Tool_No@!@Tool_No*!*Tool_Desc@!@Tool_Desc*!*Qty@!@Qty*!*Location@!@Location*!*Tool_Comment@!@Tool_Comment")
+			'		F.Data.DataTable.SaveToDB("Import1", "con","GCG_5710_KitSheet","KIT_NO",256,"Kit_No@!@Kit_No*!*Item_No@!@Item_No*!*Machine@!@Machine*!*Tool_No@!@Tool_No*!*Tool_Desc@!@Tool_Desc*!*Qty@!@Qty*!*Location@!@Location*!*Tool_Comment@!@Tool_Comment")
+					f.Data.DataTable.Close("Import1")
+				f.Intrinsic.Control.EndIf
+			f.Intrinsic.Control.EndIf
+			
+		f.Intrinsic.Control.If(V.Local.bEx1,=,True)
+			f.Intrinsic.Control.If(v.DataTable.Import2.RowCount,>,0)
+				F.Data.DataTable.SaveToDB("Import2", "con","GCG_5710_KitSheet","",128,"Kit_No@!@Kit_No*!*Item_No@!@Item_No*!*Machine@!@Machine*!*Tool_No@!@Tool_No*!*Tool_Desc@!@Tool_Desc*!*Qty@!@Qty*!*Location@!@Location*!*Tool_Comment@!@Tool_Comment")
+			f.Intrinsic.Control.EndIf
+			f.Data.DataTable.Close("Import2")
+		f.Intrinsic.Control.EndIf
+		'delete blank rows
+		f.ODBC.Connection!con.execute("delete from GCG_5710_KitSheet where Kit_No =''")
+		F.ODBC.Connection!con.Close
+	f.Intrinsic.Control.Else
+		f.Intrinsic.Control.CallSub(Error_Log,"ERRMSG","Import file not found")
+	f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+'	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(Error_Log,"ERRMSG",V.Local.sError)
+F.Intrinsic.Control.EndTry
+
+Program.Sub.Loaddata1.End
+
+
+Program.Sub.Print_Report.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare	
+	
+
+V.local.iBiRunID.Declare(long)
+V.local.iBILogID.Declare(long)
+V.Local.sRet.Declare(String)
+V.Local.sParams.Declare(String)
+V.Local.sValues.Declare(String)
+V.Local.iRet.Declare(long)
+V.Local.sRptName.Declare(String)
+V.Local.iRptid.Declare(long)
+v.Local.iItemLinkID.Declare
+v.Local.sItemID.Declare
+V.Local.sSQL.Declare
+v.Local.sfile.Declare
+v.Local.lRetDocID.Declare
+
+
+
+f.Intrinsic.Control.CallSub(Read_configFile)
+
+'Function.Intrinsic.UI.InvokeWaitDialog("KIT Sheet Report Printing in progress please wait ...")
+
+F.ODBC.Connection!con.OpenCompanyConnection(300)
+
+F.Intrinsic.String.Build("delete from GCG_5710_Report where TERMINAL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+f.ODBC.Connection!con.execute(V.Local.sSQL)
+F.Intrinsic.String.Build("insert into GCG_5710_Report select  GCG_5710_KitSheet.*,Router_SEQ,Job + '-' + suffix as WO,Terminal from V_BI_BAR_DETAIL join GCG_5710_KitSheet on rtrim(oper_sort_code) = rtrim(Kit_no) where TERMINAL = '{0}' and RPTID = '001811' and Router_Seq < '990000' and oper_sort_code <> '' and  LMO = 'L' and copy_no = 0",V.Caller.Terminal,V.Local.sSQL)
+f.ODBC.Connection!con.execute(V.Local.sSQL)
+
+F.Intrinsic.String.Build("select distinct Job + suffix as WO from V_BI_BAR_DETAIL where TERMINAL = '{0}' and RPTID = '001811'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!con.OpenLocalRecordsetRO("rst",V.Local.sSql)
+F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,=,false)
+	''router labor sequence that requires a kit.
+	v.Local.sItemID.Set(V.ODBC.con!rst.FieldValTrim!WO)
+f.Intrinsic.Control.Else
+	F.ODBC.con!rst.Close
+	F.ODBC.Connection!con.Close
+	f.Intrinsic.Control.end
+f.Intrinsic.Control.EndIf
+F.ODBC.con!rst.Close
+
+F.ODBC.Connection!con.Close
+
+F.Global.BI.GetRunID(V.local.iBIRunID)
+F.Global.BI.GetIDFromName("GCG_5710_Report.rpt",V.Local.iRptid)
+F.Global.BI.StartLogging(V.Local.iBIRunID,V.Local.iRptid,0,"",V.Local.iBILogID)
+
+F.Global.BI.StopLogging(V.local.iBILogID)
+
+V.Local.sParams.Set("Trmnl")
+
+F.Intrinsic.String.Build("{0}",v.Caller.Terminal,V.Local.sValues)
+
+
+'F.Global.BI.RunReportPreProcessor(V.local.iBiRunID,V.local.iBILogID,V.Local.sParams,V.Local.sValues,"",-1,True,"",-1,"",-1,"","",V.Local.iRet)
+f.Intrinsic.String.Build("{0}ToolKitReport.pdf",V.Global.sOUTPUTFile,v.Local.sfile)
+F.Global.BI.RunReportPreProcessor(V.local.iBiRunID,V.local.iBILogID,V.Local.sParams,V.Local.sValues,"",4,True,"",-1,"",0,v.Local.sfile,"",V.Local.iRet)
+
+'Function.Intrinsic.UI.CloseWaitDialog
+
+
+F.Global.DocumentControl.GetLinkID(v.Local.sItemID,20,v.Local.iItemLinkID)
+f.Intrinsic.Control.If(v.Local.iItemLinkID,=,-1)
+	F.Global.DocumentControl.CreateReference(v.Local.sItemID,20,v.Local.iItemLinkID)
+f.Intrinsic.Control.Else
+	Function.Global.DocumentControl.GetDocumentID(v.Local.iItemLinkID,"TOOLKITREPORT.PDF",v.Local.lRetDocID)
+	Function.Global.DocumentControl.DeleteDocument(v.Local.lRetDocID)
+F.Intrinsic.Control.Endif	
+Function.Global.DocumentControl.AddDocument(v.Local.iItemLinkID,v.Local.sfile,"Kit sheet Report",-1,"PDF") 
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Print_Report.End
+
+Program.Sub.Error_Log.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare	
+	v.Local.iUsrId.Declare
+	v.Local.sSender.Declare
+	v.Local.sTemp.Declare
+	v.Local.sRecipient.Declare
+	v.Local.sTemp1.Declare
+
+	f.Global.Security.GetUserId(v.Caller.User,v.Caller.CompanyCode,v.Local.iUsrId)
+	f.Global.Security.GetFullName(v.Caller.User,v.Local.sTemp)
+	f.Global.Security.GetUserEmail(v.Caller.User,v.Local.sTemp1)
+	f.Intrinsic.String.Build("{0}*!*{1}",v.Local.sTemp1,v.Local.sTemp,v.Local.sSender)
+	v.Local.sTemp.Set("")
+	v.Local.sTemp1.Set("")
+	f.Global.Security.GetGroupEmails("KITSHEET",v.Local.sTemp)
+	'split the emails
+	f.Intrinsic.String.Split(v.Local.sTemp,"*!*",v.Local.sTemp)
+	'put the emails back together
+	f.Intrinsic.String.Join(v.Local.sTemp,"@!@*!*",v.Local.sTemp)
+	'put *!* in the front of the string
+	f.Intrinsic.String.Build("*!*{0}",v.Local.sTemp,v.Local.sRecipient)
+	v.Local.sTemp.Redim(0,0)
+	v.Local.sTemp.Set(v.Args.ERRMSG)
+	f.Global.Messaging.QueueMessage(v.Caller.CompanyCode,v.Local.iUsrID,"GCG_5710","KitSheet Import Error",v.Local.sSender,v.Local.sRecipient,v.Local.sTemp)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Error_Log.End
+
+Program.Sub.Read_configFile.Start
+F.Intrinsic.Control.Try
+
+V.Local.sRet.Declare
+V.Local.sFile.Declare
+V.Local.bEx.Declare
+V.Local.sFilter.Declare
+V.Global.sFile1.Declare
+V.Global.sFile2.Declare
+V.Global.sOUTPUTFile.Declare
+
+F.Intrinsic.String.Build("{0}\Custom\5710\GCG_5710.cfg",V.Caller.GlobalDir,V.Local.sFile)
+F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bEx)
+	f.Intrinsic.Control.If(V.Local.bEx,=,True)
+
+	f.Intrinsic.File.File2String(V.Local.sFile,V.Local.sRet)
+	
+	F.Data.DataTable.CreateFromString("DTConfig",V.Local.sRet,"Type*!*Location","string*!*string","|",v.Ambient.NewLine,false)
+	
+	V.Local.sFilter.Set("Type='INPUT1'")
+	f.Data.DataTable.Select("DTconfig",v.Local.sFilter,V.Local.sRet)
+	f.Intrinsic.Control.If(v.Local.sRet,<>,"***NORETURN***")
+		F.Intrinsic.String.Build("{0}\{1}",V.Caller.GlobalDir,V.DataTable.DTconfig(V.Local.sRet).Location!FieldValtrim,V.Global.sFile1)
+	f.Intrinsic.Control.EndIf
+	
+	V.Local.sFilter.Set("Type='INPUT2'")
+	f.Data.DataTable.Select("DTconfig",v.Local.sFilter,V.Local.sRet)
+	f.Intrinsic.Control.If(v.Local.sRet,<>,"***NORETURN***")
+		F.Intrinsic.String.Build("{0}\{1}",V.Caller.GlobalDir,V.DataTable.DTconfig(V.Local.sRet).Location!FieldValtrim,V.Global.sFile2)
+	f.Intrinsic.Control.EndIf	
+	
+	V.Local.sFilter.Set("Type='OUTPUT'")
+	f.Data.DataTable.Select("DTconfig",v.Local.sFilter,V.Local.sRet)
+	f.Intrinsic.Control.If(v.Local.sRet,<>,"***NORETURN***")
+		V.Global.sOUTPUTFile.Set(V.DataTable.DTconfig(V.Local.sRet).Location!FieldVal)
+		F.Intrinsic.String.Build("{0}\{1}",V.Caller.GlobalDir,V.DataTable.DTconfig(V.Local.sRet).Location!FieldValtrim,V.Global.sOUTPUTFile)
+	f.Intrinsic.Control.EndIf	
+	
+	f.Data.DataTable.Close("DTConfig")
+f.Intrinsic.Control.Else
+	f.Intrinsic.Control.CallSub(Error_Log,"ERRMSG","Config file GCG_5710.cfg not found")
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	f.Intrinsic.Control.CallSub(Error_Log,"ERRMSG","Error Reading config File")
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Error_Log.End
+
+
+Program.Sub.Read_configFile.End
+
+Program.Sub.Print_Report_1.Start
+
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare	
+	
+
+V.local.iBiRunID.Declare(long)
+V.local.iBILogID.Declare(long)
+V.Local.sRet.Declare(String)
+V.Local.sParams.Declare(String)
+V.Local.sValues.Declare(String)
+V.Local.iRet.Declare(long)
+V.Local.sRptName.Declare(String)
+V.Local.iRptid.Declare(long)
+v.Local.iItemLinkID.Declare
+v.Local.sItemID.Declare
+V.Local.sSQL.Declare
+v.Local.sfile.Declare
+v.Local.lRetDocID.Declare
+
+
+
+f.Intrinsic.Control.CallSub(Read_configFile)
+
+'Function.Intrinsic.UI.InvokeWaitDialog("KIT Sheet Report Printing in progress please wait ...")
+
+F.ODBC.Connection!con.OpenCompanyConnection(300)
+
+F.Intrinsic.String.Build("delete from GCG_5710_Report where TERMINAL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+f.ODBC.Connection!con.execute(V.Local.sSQL)
+F.Intrinsic.String.Build("insert into GCG_5710_Report select  GCG_5710_KitSheet.*,Router_SEQ,Job + '-' + suffix as WO,Terminal from V_BI_BAR_DETAIL join GCG_5710_KitSheet on rtrim(oper_sort_code) = rtrim(Kit_no) where TERMINAL = '{0}' and RPTID = '001811' and Router_Seq < '990000' and oper_sort_code <> '' and  LMO = 'L' and copy_no = 0",V.Caller.Terminal,V.Local.sSQL)
+f.ODBC.Connection!con.execute(V.Local.sSQL)
+
+
+F.Intrinsic.String.Build("select distinct WO,Router_SEQ from GCG_5710_Report where TERMINAL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!con.OpenLocalRecordsetRO("rst",V.Local.sSql)
+'F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,=,false)
+
+	F.Global.BI.GetRunID(V.local.iBIRunID)
+	F.Global.BI.GetIDFromName("GCG_5710_Report.rpt",V.Local.iRptid)
+	F.Global.BI.StartLogging(V.Local.iBIRunID,V.Local.iRptid,0,"",V.Local.iBILogID)
+	
+	F.Global.BI.StopLogging(V.local.iBILogID)
+	
+	
+f.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,True)
+	''router labor sequence that requires a kit.
+'	v.Local.sItemID.Set(V.ODBC.con!rst.FieldValTrim!WO)
+
+'	F.Global.BI.GetRunID(V.local.iBIRunID)
+'	F.Global.BI.GetIDFromName("GCG_5710_Report.rpt",V.Local.iRptid)
+'	F.Global.BI.StartLogging(V.Local.iBIRunID,V.Local.iRptid,0,"",V.Local.iBILogID)
+'	
+'	F.Global.BI.StopLogging(V.local.iBILogID)
+'	
+	V.Local.sParams.Set("Trmnl*!*Wo*!*SEQ")
+	
+	F.Intrinsic.String.Build("{0}*!*{1}*!*{2}",v.Caller.Terminal,V.ODBC.con!rst.FieldValTrim!WO,V.ODBC.con!rst.FieldValTrim!Router_SEQ,V.Local.sValues)
+	
+	
+	'F.Global.BI.RunReportPreProcessor(V.local.iBiRunID,V.local.iBILogID,V.Local.sParams,V.Local.sValues,"",-1,True,"",-1,"",-1,"","",V.Local.iRet)
+	f.Intrinsic.String.Build("{0}ToolKitReport_{1}_{2}.pdf",V.Global.sOUTPUTFile,V.ODBC.con!rst.FieldValTrim!WO,V.ODBC.con!rst.FieldValTrim!Router_SEQ,v.Local.sfile)
+	F.Global.BI.RunReportPreProcessor(V.local.iBiRunID,V.local.iBILogID,V.Local.sParams,V.Local.sValues,"",4,True,"",-1,"",0,v.Local.sfile,"",V.Local.iRet)
+	
+	'Function.Intrinsic.UI.CloseWaitDialog
+	
+	f.Intrinsic.String.Build("{0}{1}",V.ODBC.con!rst.FieldVal!WO,V.ODBC.con!rst.FieldVal!Router_SEQ,v.Local.sItemID)
+	f.Intrinsic.String.Replace(v.Local.sItemID,"-","",v.Local.sItemID)
+
+	F.Global.DocumentControl.GetLinkID(v.Local.sItemID,25,v.Local.iItemLinkID)
+	
+	f.Intrinsic.Control.If(v.Local.iItemLinkID,=,-1)
+		F.Global.DocumentControl.CreateReference(v.Local.sItemID,25,v.Local.iItemLinkID)
+	f.Intrinsic.Control.Else
+		Function.Global.DocumentControl.GetDocumentID(v.Local.iItemLinkID,"TOOLKITREPORT.PDF",v.Local.lRetDocID)
+		Function.Global.DocumentControl.DeleteDocument(v.Local.lRetDocID)
+	F.Intrinsic.Control.Endif	
+	Function.Global.DocumentControl.AddDocument(v.Local.iItemLinkID,v.Local.sfile,"Kit sheet Report",-1,"PDF") 
+	F.ODBC.con!rst.MoveNext
+Function.Intrinsic.Control.Loop
+F.ODBC.con!rst.Close
+
+F.ODBC.Connection!con.Close
+
+
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+
+
+
+
+
+Program.Sub.Print_Report_1.End
